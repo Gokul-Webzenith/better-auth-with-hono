@@ -1,0 +1,29 @@
+{
+  "name": "@repo/db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.2.0",
+    "@types/pg": "^8.16.0",
+    "drizzle-kit": "0.29.0",
+    "drizzle-orm": "^0.45.1",
+    "tsup": "^8.5.1"
+  }
+}
