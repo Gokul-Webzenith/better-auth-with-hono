@@ -43,7 +43,7 @@ export const auth = betterAuth({
   // Use validated vars
   secret: AUTH_SECRET,
   baseURL: APP_URL,
-z
+
   emailAndPassword: {
     enabled: true,
   },
