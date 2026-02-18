@@ -3,9 +3,11 @@ import { defineConfig } from "tsup";
 export default defineConfig({
   entry: ["src/index.ts"],
   format: ["esm"],
-  bundle: true,        // 🔥 IMPORTANT
+  bundle: true,          // 🔥 MUST BE TRUE
   splitting: false,
   sourcemap: false,
   clean: true,
-  external: [],        // 🔥 DO NOT EXCLUDE db
+  platform: "node",
+  target: "es2022",
+  external: [],          // 🔥 VERY IMPORTANT (DO NOT exclude db)
 });
