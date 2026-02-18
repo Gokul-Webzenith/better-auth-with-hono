@@ -3,7 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "scripts": {
-    "build": "turbo run build",
+    "build": "pnpm --filter @repo/db build && pnpm --filter @repo/server build",
     "dev": "turbo run dev",
     "start": "turbo run start",
     "lint": "turbo lint",
