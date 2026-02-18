@@ -17,6 +17,7 @@ import {
 } from 'hono-openapi'
 
 import { Scalar } from '@scalar/hono-api-reference'
+import { cors } from 'hono/cors'
 
 import { z } from 'zod'
 
@@ -33,7 +34,7 @@ import {
 import { todoFormSchema } from './../../schemas/todo.schema'
 
 
-/
+
 const JWT_SECRET = process.env.JWT_SECRET!
 const COOKIE_SECRET = process.env.COOKIE_SECRET!
 
@@ -544,7 +545,7 @@ app.patch(
       success: true,
       data: todo,
     })
-  }/
+  }
 )
 
 
