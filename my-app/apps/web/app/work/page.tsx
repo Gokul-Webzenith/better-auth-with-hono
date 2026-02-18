@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+
 import { Calendar } from "@workspace/ui/components/calendar";
 import {
   Popover,
@@ -15,6 +16,7 @@ import {
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 
 import { format, formatISO } from "date-fns";
+import { authClient } from "../../lib/auth-client"; 
 
 import {
   Sheet,
@@ -127,24 +129,22 @@ const api = {
 export default function WorkPage() {
   const queryClient = useQueryClient();
 
- const router = useRouter()
+ const router = useRouter();
 
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
-      })
+const logoutMutation = useMutation({
+  mutationFn: async () => {
+    
+    await authClient.signOut();
+  },
 
-      if (!res.ok) throw new Error("Logout failed")
+  onSuccess: () => {
+    router.push("/"); 
+  },
 
-      return res.json()
-    },
-
-    onSuccess: () => {
-      router.push("/") 
-    },
-  })
+  onError: () => {
+    alert("Logout failed");
+  },
+});
 
 
 useEffect(() => {
@@ -264,25 +264,33 @@ useEffect(() => {
     );
 
     if (!editTodo) {
-      addMutation.mutate({
-        text: data.text,
-        description: data.description,
-        startAt,
-        endAt,
-        status: data.status,
-      });
-    } 
+  addMutation.mutate({
+    text: data.text,
+    description: data.description,
+    status: data.status,
+
+    startDate: data.startDate,
+    startTime: data.startTime,
+    endDate: data.endDate,
+    endTime: data.endTime,
+  });
+}
+
     else {
-      updateMutation.mutate({
-        id: editTodo.id,
-        data: {
-          ...editTodo,
-          ...data,
-          startAt,
-          endAt,
-        },
-      });
-    }
+  updateMutation.mutate({
+    id: editTodo.id,
+    data: {
+      text: data.text,
+      description: data.description,
+      status: data.status,
+
+      startDate: data.startDate,
+      startTime: data.startTime,
+      endDate: data.endDate,
+      endTime: data.endTime,
+    },
+  });
+}
 
     reset();
     closeSheet();

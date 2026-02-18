@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
 import {
@@ -10,56 +10,57 @@ import {
   CardTitle,
 } from '@workspace/ui/components/card'
 
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts'
 import { useMutation } from '@tanstack/react-query'
-type Stats = {
-  totalUsers: number
-}
+
+import { useAdminStore } from '@repo/store' // adjust path
 
 export default function AdminDashboard() {
   const router = useRouter()
- 
 
-  const logoutMutation = useMutation({
+  // Zustand state
+  const {
+    loading,
+    isAdmin,
+    stats,
+    setLoading,
+    setIsAdmin,
+    setStats,
+    reset,
+  } = useAdminStore()
+
+  
+   const logoutMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/logout", {
-        method: "POST",
-        credentials: "include",
+      const res = await fetch('/api/logout', {
+        method: 'POST',
+        credentials: 'include',
       })
 
-      if (!res.ok) throw new Error("Logout failed")
+      if (!res.ok) throw new Error('Logout failed')
 
       return res.json()
     },
 
     onSuccess: () => {
-      router.push("/") 
+      reset()
+      router.push('/')
     },
   })
- 
-  const [loading, setLoading] = useState(true)
-  const [isAdmin, setIsAdmin] = useState(false)
-  const [stats, setStats] = useState<Stats | null>(null)
 
+  // Check admin
   useEffect(() => {
-    fetch('/api/me', { credentials: 'include' })
-      .then((res) => {
-        if (res.status === 401) {
+    const checkAdmin = async () => {
+      try {
+        const meRes = await fetch('/api/me', {
+          credentials: 'include',
+        })
+
+        if (meRes.status === 401) {
           router.push('/')
-          return null
+          return
         }
 
-        return res.json()
-      })
-      .then((me) => {
-        if (!me) return
+        const me = await meRes.json()
 
         if (me.role !== 'admin') {
           router.push('/work')
@@ -68,41 +69,60 @@ export default function AdminDashboard() {
 
         setIsAdmin(true)
 
-        return fetch('/api/admin/user-count', {
-          credentials: 'include',
-        })
-      })
-      .then((res) => {
-        if (!res) return
-        return res.json()
-      })
-      .then((data) => {
-        if (data) setStats(data)
+        const statsRes = await fetch(
+          '/api/admin/user-count',
+          {
+            credentials: 'include',
+          }
+        )
+
+        const data = await statsRes.json()
+
+        setStats(data)
+      } catch {
+        router.push('/')
+      } finally {
         setLoading(false)
-      })
-      .catch(() => router.push('/'))
-  }, [])
+      }
+    }
 
+    checkAdmin()
+  }, [
+    router,
+    setIsAdmin,
+    setLoading,
+    setStats,
+  ])
 
+  // Loading
   if (loading) {
-    return <p className="p-6">Checking permission...</p>
+    return (
+      <p className="p-6">
+        Checking permission...
+      </p>
+    )
   }
 
+  // Not admin
   if (!isAdmin) {
     return null
   }
 
-
-  // 🔹 Render
+  // UI
   return (
     <div className="p-6 space-y-6">
 
       <h1 className="text-3xl font-bold">
         Admin Dashboard
       </h1>
-  <button onClick={() => logoutMutation.mutate()} className="bg-black  text-white p-3 mt-10 ml-4">
-      Logout
-    </button>
+
+      <button
+        onClick={() => logoutMutation.mutate()}
+        className="bg-black text-white p-3 mt-4"
+      >
+        Logout
+      </button>
+
       <Card className="max-w-sm">
         <CardHeader>
           <CardTitle>Total Users</CardTitle>

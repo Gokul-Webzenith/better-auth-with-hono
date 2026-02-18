@@ -58,6 +58,7 @@ export default function Page() {
     queryKey: ["todos"],
     queryFn: fetchTodos,
   });
+  
   useEffect(() => {
   if (isError && (error as Error)?.message === "UNAUTHORIZED") {
     router.push("/");
@@ -65,7 +66,7 @@ export default function Page() {
 }, [isError, error, router]);
 
 
-  /* ---------- Loading ---------- */
+
 
   if (isLoading) {
     return (

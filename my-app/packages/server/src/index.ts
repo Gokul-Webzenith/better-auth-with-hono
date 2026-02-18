@@ -1,217 +1,283 @@
-import { Hono } from "hono";
-import { logger } from "hono/logger";
+import { Hono } from 'hono'
+import { logger } from 'hono/logger'
+import { serve } from "@hono/node-server";
 import {
   setSignedCookie,
   deleteCookie,
   getSignedCookie,
-} from "hono/cookie";
+} from 'hono/cookie'
+import bcrypt from 'bcrypt'
+import jwt from 'jsonwebtoken'
+import { auth } from "./../auth";
+import {
+  describeRoute,
+  resolver,
+  validator,
+  openAPIRouteHandler,
+} from 'hono-openapi'
 
-import bcrypt from "bcrypt";
-import jwt from "jsonwebtoken";
+import { Scalar } from '@scalar/hono-api-reference'
 
-import { getDb, todos, user } from "@repo/db";
-import { eq, and,sql } from "drizzle-orm";
+import { z } from 'zod'
 
-const db = getDb();
+import { getDb, todos, user } from '@repo/db'
+import { eq, and, sql } from 'drizzle-orm'
 
-const JWT_SECRET = process.env.JWT_SECRET!;
-const COOKIE_SECRET = process.env.COOKIE_SECRET!;
+// 👉 Import your schemas
+import {
+  signupSchema,
+  loginSchema,
+  patchTodoSchema
+} from './../../schemas/auth.schema'
+
+import { todoFormSchema } from './../../schemas/todo.schema'
+
+
+/
+const JWT_SECRET = process.env.JWT_SECRET!
+const COOKIE_SECRET = process.env.COOKIE_SECRET!
+
+const db = getDb()
+
 type Variables = {
-  userId: number;
-  role: string;
-};
+  userId: number
+  role: string
+}
 
-const app = new Hono<{ Variables: Variables }>().basePath("/api");
+const app = new Hono<{ Variables: Variables }>().basePath('/api')
+
+app.use('*', logger())
+
+app.on(["POST", "GET"], "auth/*", (c) => {
+	return auth.handler(c.req.raw);
+});
+
+const idParamSchema = z.object({
+  id: z.string(),
+})
+app.use(
+  '*',
+  cors({
+    origin: 'https://your-frontend-domain.com',
+    credentials: true,
+  })
+)
 
 
-app.use("*", logger());
+// // ================= MIDDLEWARE =================
+
+// const authMiddleware = async (c: any, next: any) => {
+//   try {
+//     const token = await getSignedCookie(
+//       c,
+//       COOKIE_SECRET,
+//       'auth_token'
+//     )
+
+//     if (!token) {
+//       return c.json({ message: 'Login required' }, 401)
+//     }
+
+//     const decoded = jwt.verify(token, JWT_SECRET) as {
+//       userId: number
+//       role: string
+//     }
+
+//     c.set('userId', decoded.userId)
+//     c.set('role', decoded.role)
+
+//     await next()
+//   } catch {
+//     return c.json({ message: 'Invalid token' }, 401)
+//   }
+// }
+
+// const adminMiddleware = async (c: any, next: any) => {
+//   if (c.get('role') !== 'admin') {
+//     return c.json({ message: 'Admins only' }, 403)
+//   }
+
+//   await next()
+// }
+
+// // ================= AUTH =================
+
+// // SIGNUP
+// app.post(
+//   '/signup',
+
+//   describeRoute({
+//     description: 'Register new user',
+
+//     request: {
+//       body: {
+//         content: {
+//           'application/json': {
+//             schema: resolver(signupSchema),
+//           },
+//         },
+//       },
+//     },
+
+//     responses: {
+//       200: { description: 'Signup success' },
+//       400: { description: 'User exists' },
+//     },
+//   }),
+
+//   validator('json', signupSchema, (result, c) => {
+//     if (!result.success) {
+//       return c.json(result.error.flatten(), 400)
+//     }
+//   }),
+
+//   async (c) => {
+//     const { email, password } = c.req.valid('json')
+
+//     const exists = await db
+//       .select()
+//       .from(user)
+//       .where(eq(user.email, email))
+
+//     if (exists.length) {
+//       return c.json({ message: 'User exists' }, 400)
+//     }
+
+//     const hashed = await bcrypt.hash(password, 10)
+
+//     await db.insert(user).values({
+//       email,
+//       password: hashed,
+//       role: 'user',
+//     })
+
+//     return c.json({ message: 'Signup success' })
+//   }
+// )
+
+// // LOGIN
+// app.post(
+//   '/login',
+
+//   describeRoute({
+//     description: 'Login user',
+
+//     request: {
+//       body: {
+//         content: {
+//           'application/json': {
+//             schema: resolver(loginSchema),
+//           },
+//         },
+//       },
+//     },
+
+//     responses: {
+//       200: { description: 'Login success' },
+//       401: { description: 'Invalid credentials' },
+//     },
+//   }),
+
+//   validator('json', loginSchema, (result, c) => {
+//     if (!result.success) {
+//       return c.json(result.error.flatten(), 400)
+//     }
+//   }),
+
+//   async (c) => {
+//     const { email, password } = c.req.valid('json')
+
+//     const result = await db
+//       .select()
+//       .from(user)
+//       .where(eq(user.email, email))
+
+//     if (!result.length) {
+//       return c.json({ message: 'Invalid credentials' }, 401)
+//     }
+
+//     const u = result[0]
+
+//     const valid = await bcrypt.compare(password, u.password)
+
+//     if (!valid) {
+//       return c.json({ message: 'Invalid credentials' }, 401)
+//     }
+
+//     const token = jwt.sign(
+//       {
+//         userId: u.id,
+//         role: u.role,
+//       },
+//       JWT_SECRET,
+//       { expiresIn: '24h' }
+//     )
+
+//     await setSignedCookie(c, 'auth_token', token, COOKIE_SECRET, {
+//       httpOnly: true,
+//       secure: false,
+//       sameSite: 'Lax',
+//       path: '/',
+//     })
+
+//     return c.json({ success: true })
+//   }
+// )
+
+
+// app.post('/logout', authMiddleware, (c) => {
+//   deleteCookie(c, 'auth_token', { path: '/' })
+
+//   return c.json({ message: 'Logged out' })
+// })
+
+// filepath: /home/gokul/weekly-authentication-and-authorization/my-app/packages/server/src/index.ts
+// ...existing code...
 
 
 
-const authMiddleware = async (
-  c: any,
-  next: any
-) => {
-
-  try {
-    const token = await getSignedCookie(
-      c,
-      COOKIE_SECRET,
-      "auth_token"
-    );
-
-    if (!token) {
-      return c.json(
-        { message: "Please login first" },
-        401
-      );
-    }
-
-    const decoded = jwt.verify(token, JWT_SECRET) as {
-  userId: number;
-  role: string;
-};
-
-c.set("userId", decoded.userId);
-c.set("role", decoded.role); // ✅
-
-    await next();
-  } catch (err) {
-    return c.json(
-      { message: "Invalid or expired token" },
-      401
-    );
-  }
-};
-
-const adminMiddleware = async (c: any, next: any) => {
-  const role = c.get("role");
-
-  if (role !== "admin") {
-    return c.json(
-      { message: "Admins only" },
-      403
-    );
-  }
-
-  await next();
-};
 app.get(
-  "/admin/user-count",
-  authMiddleware,
-  adminMiddleware,
+  '/admin/user-count',
+
+  
   async (c) => {
     const result = await db
       .select({ count: sql<number>`count(*)` })
-      .from(user);
+      .from(user)
 
-    return c.json({
-      totalUsers: result[0].count
-    });
+    return c.json({ totalUsers: result[0].count })
   }
-);
+)
+
+
+
+
+
+app.get('/me',  (c) => {
+  return c.json({
+    id: c.get('userId'),
+    role: c.get('role'),
+  })
+})
+
 app.get(
-  "/me",
-  authMiddleware,
-  async (c) => {
-    return c.json({
-      id: c.get("userId"),
-      role: c.get("role")
-    });
-  }
-);
+  '/',
 
+  describeRoute({
+    description: 'Get all todos for current user',
 
-app.post("/signup", async (c) => {
-  const { email, password } = await c.req.json();
-
-  if (!email || !password) {
-    return c.json(
-      { message: "Missing fields" },
-      400
-    );
-  }
-
-  const exists = await db
-    .select()
-    .from(user)
-    .where(eq(user.email, email));
-
-  if (exists.length) {
-    return c.json(
-      { message: "User already exists" },
-      400
-    );
-  }
-
-  const hashed = await bcrypt.hash(password, 10);
-
- await db.insert(user).values({
-  email,
-  password: hashed,
-  role: 'user' 
-});
-
-
-  return c.json({ message: "Signup success" });
-});
-
-
-app.post("/login", async (c) => {
-  const { email, password } = await c.req.json();
-
-  const result = await db
-    .select()
-    .from(user)
-    .where(eq(user.email, email));
-
-  if (!result.length) {
-    return c.json(
-      { message: "Invalid credentials" },
-      401
-    );
-  }
-
-  const u = result[0];
-
-
-if (!u) {
-  return c.json(
-    { message: "Invalid credentials" },
-    401
-  );
-}
-
-const valid = await bcrypt.compare(
-  password,
-  u.password
-);
-
-  if (!valid) {
-    return c.json(
-      { message: "Invalid credentials" },
-      401
-    );
-  }
-  const token = jwt.sign(
-    {
-      userId: u.id,
-      email: u.email,
-      role: u.role,
+    responses: {
+      200: {
+        description: 'List of todos',
+      },
+      401: {
+        description: 'Unauthorized',
+      },
     },
-    JWT_SECRET,
-    { expiresIn: "24h" }
-  );
+  }),
 
-  await setSignedCookie(
-    c,
-    "auth_token",
-    token,
-    COOKIE_SECRET,
-    {
-      httpOnly: true,
-      secure: false, 
-      sameSite: "Lax",
-      path: "/",
-    }
-  );
-
-  return c.json({ success: true });
-});
-
-
-app.post("/logout", (c) => {
-  deleteCookie(c, "auth_token", {
-    path: "/",
-  });
-
-  return c.json({ message: "Logged out" });
-});
-
-
-app.get("/", authMiddleware, async (c) => {
-  try {
-    const userId = c.get("userId");
+  async (c) => {
+    const userId = c.get('userId');
 
     const data = await db
       .select()
@@ -219,20 +285,51 @@ app.get("/", authMiddleware, async (c) => {
       .where(eq(todos.userId, userId));
 
     return c.json(data);
-  } catch (error) {
-    console.error(error);
-
-    return c.json(
-      { message: "Failed to fetch todos" },
-      500
-    );
   }
-});
+);
 
-app.post("/", authMiddleware, async (c) => {
-  try {
-    const userId = c.get("userId");
-    const body = await c.req.json();
+// CREATE
+app.post(
+  '/',
+
+
+  describeRoute({
+    description: 'Create todo',
+
+    request: {
+      body: {
+        content: {
+          'application/json': {
+            schema: resolver(todoFormSchema),
+          },
+        },
+      },
+    },
+
+    responses: {
+      201: { description: 'Created' },
+      400: { description: 'Validation error' },
+      401: { description: 'Unauthorized' },
+    },
+  }),
+
+  validator('json', todoFormSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(result.error.flatten(), 400)
+    }
+  }),
+
+  async (c) => {
+    const userId = c.get('userId')
+    const body = c.req.valid('json')
+
+    const startAt = new Date(
+      `${body.startDate}T${body.startTime}`
+    )
+
+    const endAt = new Date(
+      `${body.endDate}T${body.endTime}`
+    )
 
     const [todo] = await db
       .insert(todos)
@@ -241,164 +338,224 @@ app.post("/", authMiddleware, async (c) => {
         description: body.description,
         status: body.status,
 
-        startAt: new Date(body.startAt),
-        endAt: new Date(body.endAt),
+        startAt,
+        endAt,
 
-    
         userId,
       })
-      .returning();
+      .returning()
 
-    return c.json(
-      { success: true, data: todo },
-      201
-    );
-  } catch (error) {
-    console.error(error);
-
-    return c.json(
-      { message: "Failed to create todo" },
-      500
-    );
+    return c.json({ success: true, data: todo }, 201)
   }
-});
+)
 
+// UPDATE
+app.put(
+  '/:id',
 
-app.put("/:id", authMiddleware, async (c) => {
-  try {
-    const userId = c.get("userId");
-    const id = Number(c.req.param("id"));
+ 
 
-    const body = await c.req.json();
+  describeRoute({
+    description: 'Update todo',
+
+    request: {
+      params: resolver(idParamSchema),
+
+      body: {
+        content: {
+          'application/json': {
+            schema: resolver(todoFormSchema),
+          },
+        },
+      },
+    },
+
+    responses: {
+      200: { description: 'Updated' },
+      404: { description: 'Not found' },
+    },
+  }),
+
+  validator('param', idParamSchema),
+  validator('json', todoFormSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(result.error.flatten(), 400)
+    }
+  }),
+
+  async (c) => {
+    const userId = c.get('userId')
+    const { id } = c.req.valid('param')
+    const body = c.req.valid('json')
+
+    const startAt = new Date(
+      `${body.startDate}T${body.startTime}`
+    )
+
+    const endAt = new Date(
+      `${body.endDate}T${body.endTime}`
+    )
 
     const [todo] = await db
       .update(todos)
       .set({
-        text: body.text,
-        description: body.description,
-        status: body.status,
-
-        startAt: new Date(body.startAt),
-        endAt: new Date(body.endAt),
+        ...body,
+        startAt,
+        endAt,
       })
       .where(
         and(
-          eq(todos.id, id),
+          eq(todos.id, Number(id)),
           eq(todos.userId, userId)
         )
       )
-      .returning();
+      .returning()
 
     if (!todo) {
-      return c.json(
-        { message: "Todo not found" },
-        404
-      );
+      return c.json({ message: 'Not found' }, 404)
     }
 
-    return c.json({
-      success: true,
-      data: todo,
-    });
-  } catch (error) {
-    console.error(error);
-
-    return c.json(
-      { message: "Failed to update todo" },
-      500
-    );
+    return c.json({ success: true, data: todo })
   }
-});
+)
 
-app.patch("/:id", authMiddleware, async (c) => {
-  try {
-    const userId = c.get("userId");
-    const id = Number(c.req.param("id"));
+// DELETE
+app.delete(
+  '/:id',
 
-    const body = await c.req.json();
+  
 
-    const updateData: any = {};
+  describeRoute({
+    description: 'Delete todo',
 
-    if (body.text !== undefined)
-      updateData.text = body.text;
+    request: {
+      params: resolver(idParamSchema),
+    },
 
-    if (body.description !== undefined)
-      updateData.description = body.description;
+    responses: {
+      200: { description: 'Deleted' },
+      404: { description: 'Not found' },
+    },
+  }),
 
-    if (body.status !== undefined)
-      updateData.status = body.status;
+  validator('param', idParamSchema),
 
-    if (body.startAt !== undefined)
-      updateData.startAt = new Date(body.startAt);
-
-    if (body.endAt !== undefined)
-      updateData.endAt = new Date(body.endAt);
-
-    const [todo] = await db
-      .update(todos)
-      .set(updateData)
-      .where(
-        and(
-          eq(todos.id, id),
-          eq(todos.userId, userId)
-        )
-      )
-      .returning();
-
-    if (!todo) {
-      return c.json(
-        { message: "Todo not found" },
-        404
-      );
-    }
-
-    return c.json({
-      success: true,
-      data: todo,
-    });
-  } catch (error) {
-    console.error(error);
-
-    return c.json(
-      { message: "Failed to patch todo" },
-      500
-    );
-  }
-});
-
-app.delete("/:id", authMiddleware, async (c) => {
-  try {
-    const userId = c.get("userId");
-    const id = Number(c.req.param("id"));
+  async (c) => {
+    const userId = c.get('userId')
+    const { id } = c.req.valid('param')
 
     const result = await db
       .delete(todos)
       .where(
         and(
-          eq(todos.id, id),
+          eq(todos.id, Number(id)),
           eq(todos.userId, userId)
         )
-      );
+      )
 
     if (!result.rowCount) {
-      return c.json(
-        { message: "Todo not found" },
-        404
-      );
+      return c.json({ message: 'Not found' }, 404)
+    }
+
+    return c.json({ message: 'Deleted' })
+  }
+)
+
+
+app.get(
+  '/openapi',
+
+  openAPIRouteHandler(app, {
+    documentation: {
+      info: {
+        title: 'Todo API',
+        version: '1.0.0',
+        description: 'Hono + Zod + OpenAPI + Scalar',
+      },
+
+      servers: [
+        {
+          url: 'http://localhost:3000',
+        },
+      ],
+    },
+  })
+)
+
+
+app.patch(
+  '/:id',
+
+  describeRoute({
+    description: 'Patch todo (partial update)',
+
+    request: {
+      params: resolver(idParamSchema),
+
+      body: {
+        content: {
+          'application/json': {
+            schema: resolver(patchTodoSchema),
+          },
+        },
+      },
+    },
+
+    responses: {
+      200: { description: 'Updated successfully' },
+      400: { description: 'Validation error' },
+      401: { description: 'Unauthorized' },
+      404: { description: 'Not found' },
+    },
+  }),
+
+  validator('param', idParamSchema),
+
+  validator('json', patchTodoSchema, (result, c) => {
+    if (!result.success) {
+      return c.json(result.error.flatten(), 400)
+    }
+  }),
+
+  async (c) => {
+    const userId = c.get('userId')
+
+    
+    const { id } = c.req.valid('param')
+
+    const body = c.req.valid('json')
+
+    const [todo] = await db
+      .update(todos)
+      .set(body)
+      .where(
+        and(
+          eq(todos.id, Number(id)),
+          eq(todos.userId, userId)
+        )
+      )
+      .returning()
+
+    if (!todo) {
+      return c.json({ message: 'Todo not found' }, 404)
     }
 
     return c.json({
       success: true,
-      message: "Todo deleted",
-    });
-  } catch (error) {
-    console.error(error);
+      data: todo,
+    })
+  }/
+)
 
-    return c.json(
-      { message: "Failed to delete todo" },
-      500
-    );
-  }
-});
 
-export { app };
+app.get(
+  '/docs',
+
+  Scalar({
+    url: '/api/openapi',
+  })
+)
+
+
+
+export { app }

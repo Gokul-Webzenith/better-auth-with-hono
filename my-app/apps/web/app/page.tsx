@@ -1,28 +1,31 @@
-'use client'
+'use client';
 
-import { useRouter } from 'next/navigation'
-import { useForm } from 'react-hook-form'
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
 
-import { useAuthStore } from '@repo/store'
+import { useAuthStore } from '@repo/store';
 
-import { Button } from '@workspace/ui/components/button'
-import { Input } from '@workspace/ui/components/input'
+import { authClient } from './../lib/auth-client';
+
+import { Button } from '@workspace/ui/components/button';
+import { Input } from '@workspace/ui/components/input';
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from '@workspace/ui/components/card'
-import { Label } from '@workspace/ui/components/label'
+} from '@workspace/ui/components/card';
+import { Label } from '@workspace/ui/components/label';
 
 type FormData = {
-  email: string
-  password: string
-}
+  name?: string;
+  email: string;
+  password: string;
+};
 
 export default function AuthPage() {
-  const router = useRouter()
+  const router = useRouter();
 
   const {
     mode,
@@ -32,41 +35,45 @@ export default function AuthPage() {
     showpassword,
     toggleMode,
     clearMessage,
-  } = useAuthStore()
+  } = useAuthStore();
 
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
     reset,
-  } = useForm<FormData>()
+  } = useForm<FormData>();
 
+ 
   async function onSubmit(data: FormData) {
-    clearMessage()
+    clearMessage();
 
-    const url =
-      mode === 'login' ? '/api/login' : '/api/signup'
+    try {
+      if (mode === 'login') {
+      
+        await authClient.signIn.email({
+          email: data.email,
+          password: data.password,
+        });
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify(data),
-    })
+      
+        router.replace('/work');
 
-    const result = await res.json()
+      } else {
+       
+        await authClient.signUp.email({
+          name: data.name!,
+          email: data.email,
+          password: data.password,
+        });
 
-    if (!res.ok) {
-      setMessage(result.message)
-      return
-    }
+        toggleMode();
+        reset();
+        setMessage('Signup success. Please login.');
+      }
 
-    if (mode === 'login') {
-      router.push('/work')
-    } else {
-      toggleMode()
-      reset()
-      setMessage('Signup success. Please login.')
+    } catch (err: any) {
+      setMessage(err?.message || 'Authentication failed');
     }
   }
 
@@ -76,6 +83,7 @@ export default function AuthPage() {
       <Card className="w-full max-w-md shadow-lg">
 
         <CardHeader className="space-y-1 text-center">
+
           <CardTitle className="text-2xl font-bold">
             {mode === 'login' ? 'Login' : 'Create Account'}
           </CardTitle>
@@ -85,6 +93,7 @@ export default function AuthPage() {
               ? 'Enter your credentials to access your account'
               : 'Fill in details to create a new account'}
           </CardDescription>
+
         </CardHeader>
 
         <CardContent>
@@ -94,8 +103,31 @@ export default function AuthPage() {
             className="space-y-4"
           >
 
-            {/* Email */}
+            {mode === 'signup' && (
+              <div className="space-y-1">
+
+                <Label htmlFor="name">Name</Label>
+
+                <Input
+                  id="name"
+                  placeholder="Your name"
+                  {...register('name', {
+                    required: 'Name required',
+                  })}
+                />
+
+                {errors.name && (
+                  <p className="text-sm text-destructive">
+                    {errors.name.message}
+                  </p>
+                )}
+
+              </div>
+            )}
+
+            {/* ✅ EMAIL */}
             <div className="space-y-1">
+
               <Label htmlFor="email">Email</Label>
 
               <Input
@@ -112,50 +144,51 @@ export default function AuthPage() {
                   {errors.email.message}
                 </p>
               )}
+
             </div>
 
-          
+            {/* ✅ PASSWORD */}
             <div className="space-y-1">
+
               <Label htmlFor="password">Password</Label>
 
               <Input
                 id="password"
-                 type={showpassword ? "text" : "password"}
+                type={showpassword ? 'text' : 'password'}
                 placeholder="••••••••"
-                
-              {...register('password', {
-              required: 'Password required',
-              minLength: {
-                value: 6,
-                message: 'Password must be at least 6 characters',
-              },
-})}
-
+                {...register('password', {
+                  required: 'Password required',
+                  minLength: {
+                    value: 6,
+                    message: 'Password must be at least 6 characters',
+                  },
+                })}
               />
-              <button
-  type="button"
-  onClick={togglePassword}
-  className="text-sm text-blue-500 mt-1"
->
-  {showpassword ? "Hide" : "Show"}
-</button>
 
+              <button
+                type="button"
+                onClick={togglePassword}
+                className="text-sm text-blue-500 mt-1"
+              >
+                {showpassword ? 'Hide' : 'Show'}
+              </button>
 
               {errors.password && (
                 <p className="text-sm text-destructive">
                   {errors.password.message}
                 </p>
               )}
+
             </div>
 
-            
+         
             {message && (
               <p className="text-sm text-destructive text-center">
                 {message}
               </p>
             )}
 
-           
+            {/* ✅ SUBMIT */}
             <Button
               type="submit"
               className="w-full"
@@ -167,16 +200,17 @@ export default function AuthPage() {
                 ? 'Login'
                 : 'Sign Up'}
             </Button>
+
           </form>
 
-          {/* Toggle */}
           <div className="mt-4 text-center text-sm">
 
             <button
               type="button"
               onClick={() => {
-                toggleMode()
-                reset()
+                toggleMode();
+                reset();
+                clearMessage();
               }}
               className="text-primary underline-offset-4 hover:underline"
             >
@@ -190,6 +224,7 @@ export default function AuthPage() {
         </CardContent>
 
       </Card>
+
     </div>
-  )
+  );
 }

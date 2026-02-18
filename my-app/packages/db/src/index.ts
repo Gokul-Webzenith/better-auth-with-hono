@@ -1,9 +1,9 @@
 import pkg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { todos } from "./schema";
-import {user} from "./loginschema";
+import {user,session,account} from "./loginschema";
 const { Pool } = pkg;
-
+import "dotenv/config";
 
 let pool: pkg.Pool | null = null;
 let db: ReturnType<typeof drizzle> | null = null;
@@ -31,4 +31,4 @@ export function getDb() {
   return db;
 }
 
-export { todos, user };
+export { todos, user,session,account };
