@@ -101,6 +101,47 @@ app.use(
   })
 )
 
+// ================= PREFLIGHT =================
+
+app.options('*', (c) => c.body(null, 204))
+
+// ================= MIDDLEWARE - MUST BE BEFORE ROUTES =================
+
+app.use("*", async (c, next) => {
+  // Skip auth check for these public routes
+  const publicPaths = ['/auth', '/health', '/admin/user-count', '/openapi', '/docs']
+  
+  const isPublic = publicPaths.some(path => c.req.path === path || c.req.path.startsWith(path + '/'))
+  
+  if (isPublic) {
+    return next();
+  }
+
+  try {
+    const session = await auth.api.getSession({
+      headers: c.req.raw.headers, 
+    });
+
+    if (!session) {
+      return c.json({ message: "Login required" }, 401);
+    }
+
+    c.set("userId", session.user.id);
+  } catch (error) {
+    console.error("Auth error:", error);
+    return c.json({ message: "Authentication error" }, 500);
+  }
+
+  await next();
+});
+
+// ================= ROUTES =================
+
+// Root endpoint - quick test
+app.get('/', (c) => {
+  return c.json({ message: 'API Server is running', version: '1.0.0' })
+})
+
 // ================= HEALTH CHECK =================
 
 // Public endpoint - no auth required, instant response
@@ -116,28 +157,6 @@ app.get('/health', (c) => {
 // ================= AUTH HANDLER =================
 
 app.all('/auth/*', (c) => auth.handler(c.req.raw))
-
-
-app.use("*", async (c, next) => {
-  // Skip auth check for these public routes (without /api prefix since we use basePath)
-  const publicPaths = ['/auth', '/health', '/admin/user-count']
-  
-  if (publicPaths.some(path => c.req.path.startsWith(path))) {
-    return next();
-  }
-
-  const session = await auth.api.getSession({
-    headers: c.req.raw.headers, 
-  });
-
-  if (!session) {
-    return c.json({ message: "Login required" }, 401);
-  }
-
-  c.set("userId", session.user.id);
-
-  await next();
-});
 
 
 
