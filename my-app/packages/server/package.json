@@ -2,7 +2,7 @@
   "name": "@repo/server",
   "type": "module",
   "scripts": {
-    "dev": "pnpm exec tsx watch --env-file ../../.env src/index.ts",
+    "dev": "tsx watch --env-file ../../.env api/index.ts",
     "build": "tsup",
     "start": "node dist/index.js"
   },
@@ -13,6 +13,7 @@
     "@hono/node-server": "^1.19.9",
     "@hono/standard-validator": "^0.2.2",
     "@repo/db": "workspace:*",
+    "@repo/schemas": "workspace:*",
     "@scalar/hono-api-reference": "^0.9.41",
     "@supabase/supabase-js": "^2.93.3",
     "bcrypt": "^6.0.0",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+     "dotenv": "^17.3.1",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.19.31",
     "tsx": "^4.21.0",

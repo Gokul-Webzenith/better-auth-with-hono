@@ -5,14 +5,14 @@ export default defineConfig({
   format: ['esm'],
   target: 'node18',
 
-  outDir: 'dist',
+  outDir: 'api',
   clean: true,
   sourcemap: false,
 
   splitting: false,
   bundle: true,
 
-  // 🔥 THIS IS THE FIX
+ 
   noExternal: ['@repo/db'],
 
   // Native deps only

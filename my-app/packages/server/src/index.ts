@@ -33,9 +33,9 @@ import {
   signupSchema,
   loginSchema,
   patchTodoSchema,
-} from './../../schemas/auth.schema'
+} from '@repo/schemas'
 
-import { todoFormSchema } from './../../schemas/todo.schema'
+import { todoFormSchema } from "@repo/schemas"
 
 1
 const JWT_SECRET = process.env.JWT_SECRET!
