@@ -4,11 +4,6 @@ import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { getDb, user, session, account } from "./../db/src";
 
 const db = getDb();
-import dotenv from "dotenv";
-
-dotenv.config({
-  path: "../../.env", 
-});
 
 const AUTH_SECRET = process.env.BETTER_AUTH_SECRET;
 const APP_URL = process.env.APP_URL;
