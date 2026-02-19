@@ -118,9 +118,16 @@ app.use("*", async (c, next) => {
   }
 
   try {
-    const session = await auth.api.getSession({
+    // Add timeout for session check
+    const sessionPromise = auth.api.getSession({
       headers: c.req.raw.headers, 
     });
+    
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Auth timeout')), 5000)
+    );
+    
+    const session = await Promise.race([sessionPromise, timeoutPromise]) as any;
 
     if (!session) {
       return c.json({ message: "Login required" }, 401);
@@ -129,7 +136,7 @@ app.use("*", async (c, next) => {
     c.set("userId", session.user.id);
   } catch (error) {
     console.error("Auth error:", error);
-    return c.json({ message: "Authentication error" }, 500);
+    return c.json({ message: "Authentication required" }, 401);
   }
 
   await next();
@@ -137,21 +144,26 @@ app.use("*", async (c, next) => {
 
 // ================= ROUTES =================
 
-// Root endpoint - quick test
+// Root endpoint - quick test - MUST RETURN IMMEDIATELY
 app.get('/', (c) => {
-  return c.json({ message: 'API Server is running', version: '1.0.0' })
+  const response = { 
+    message: 'API Server is running', 
+    version: '1.0.0',
+    timestamp: new Date().toISOString()
+  }
+  return c.json(response)
 })
 
 // ================= HEALTH CHECK =================
 
-// Public endpoint - no auth required, instant response
+// Public endpoint - MUST RETURN IMMEDIATELY
 app.get('/health', (c) => {
-  return c.json({ 
+  const response = { 
     status: 'ok', 
-    message: 'Server is running',
-    database: 'connected',
+    message: 'Server is healthy',
     timestamp: new Date().toISOString()
-  })
+  }
+  return c.json(response)
 })
 
 // ================= AUTH HANDLER =================
