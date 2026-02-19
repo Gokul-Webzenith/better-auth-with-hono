@@ -82,6 +82,17 @@ type Variables = {
 
 const app = new Hono<{ Variables: Variables }>().basePath('/api')
 
+// ================= BARE TEST ROUTES - NO MIDDLEWARE =================
+
+// Simplest possible endpoint - test if server responds at all
+app.get('/ping', (c) => {
+  return c.text('pong')
+})
+
+app.get('/test', (c) => {
+  return c.json({ test: 'ok' })
+})
+
 // ================= LOGGER =================
 
 app.use('*', logger())
@@ -105,38 +116,30 @@ app.use(
 
 app.options('*', (c) => c.body(null, 204))
 
-// ================= MIDDLEWARE - MUST BE BEFORE ROUTES =================
+// ================= MIDDLEWARE - SIMPLE VERSION =================
 
 app.use("*", async (c, next) => {
-  // Skip auth check for these public routes
-  const publicPaths = ['/auth', '/health', '/admin/user-count', '/openapi', '/docs']
-  
-  const isPublic = publicPaths.some(path => c.req.path === path || c.req.path.startsWith(path + '/'))
-  
-  if (isPublic) {
+  // Skip auth check for these public routes - public paths check FIRST
+  if (c.req.path === '/health' || c.req.path === '/' || c.req.path === '/ping' || c.req.path === '/test' || c.req.path.startsWith('/auth')) {
     return next();
   }
 
-  try {
-    // Add timeout for session check
-    const sessionPromise = auth.api.getSession({
-      headers: c.req.raw.headers, 
-    });
-    
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('Auth timeout')), 5000)
-    );
-    
-    const session = await Promise.race([sessionPromise, timeoutPromise]) as any;
+  // For all other routes that require auth
+  if (c.req.path.startsWith('/admin') || c.req.path.startsWith('/todos')) {
+    try {
+      const session = await auth.api.getSession({
+        headers: c.req.raw.headers, 
+      });
 
-    if (!session) {
-      return c.json({ message: "Login required" }, 401);
+      if (!session) {
+        return c.json({ message: "Login required" }, 401);
+      }
+
+      c.set("userId", session.user.id);
+    } catch (error) {
+      console.error("Auth error:", error);
+      return c.json({ message: "Authentication required" }, 401);
     }
-
-    c.set("userId", session.user.id);
-  } catch (error) {
-    console.error("Auth error:", error);
-    return c.json({ message: "Authentication required" }, 401);
   }
 
   await next();
