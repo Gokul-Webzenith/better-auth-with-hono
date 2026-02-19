@@ -101,9 +101,17 @@ app.use(
   })
 )
 
-// ================= PREFLIGHT =================
+// ================= HEALTH CHECK =================
 
-app.options('*', (c) => c.body(null, 204))
+// Public endpoint - no auth required, instant response
+app.get('/health', (c) => {
+  return c.json({ 
+    status: 'ok', 
+    message: 'Server is running',
+    database: 'connected',
+    timestamp: new Date().toISOString()
+  })
+})
 
 // ================= AUTH HANDLER =================
 
@@ -111,14 +119,16 @@ app.all('/auth/*', (c) => auth.handler(c.req.raw))
 
 
 app.use("*", async (c, next) => {
-  if (c.req.path.startsWith("/api/auth")) {
+  // Skip auth check for these public routes
+  const publicPaths = ['/api/auth', '/api/health', '/api/admin/user-count']
+  
+  if (publicPaths.some(path => c.req.path.startsWith(path))) {
     return next();
   }
 
   const session = await auth.api.getSession({
     headers: c.req.raw.headers, 
   });
-
 
   if (!session) {
     return c.json({ message: "Login required" }, 401);
