@@ -1,5 +1,3 @@
-import "dotenv/config"; // MUST be first
-
 import pkg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { todos } from "./schema";
