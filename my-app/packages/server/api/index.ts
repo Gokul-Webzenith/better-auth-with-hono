@@ -25,18 +25,108 @@ import { cors } from 'hono/cors'
 
 import { z } from 'zod'
 
+// ==================== SCHEMAS ====================
+const signupSchema = z.object({
+  email: z
+    .string()
+    .email('Invalid email'),
+
+  password: z
+    .string()
+    .min(6, 'Password must be at least 6 chars'),
+})
+
+const loginSchema = z.object({
+  email: z
+    .string()
+    .email('Invalid email'),
+
+  password: z
+    .string()
+    .min(6, 'Password must be at least 6 chars'),
+})
+
+const patchTodoSchema = z.object({
+  status: z.enum([
+    'todo',
+    'backlog',
+    'inprogress',
+    'done',
+    'cancelled',
+  ]).optional(),
+
+  text: z.string().optional(),
+  description: z.string().optional(),
+})
+
+const todoFormSchema = z
+  .object({
+    text: z.string().min(1, "Text is required"),
+
+    description: z
+      .string()
+      .min(5, "Description required")
+      .max(100, "Description too long"),
+
+    status: z.enum([
+      "todo",
+      "backlog",
+      "inprogress",
+      "done",
+      "cancelled",
+    ]),
+
+    startDate: z
+      .string()
+      .min(1, "Start date is required"),
+
+    startTime: z
+      .string()
+      .min(1, "Start time is required"),
+
+    endDate: z
+      .string()
+      .min(1, "End date is required"),
+
+    endTime: z
+      .string()
+      .min(1, "End time is required"),
+  })
+  .superRefine((data, ctx) => {
+    const start = new Date(
+      `${data.startDate}T${data.startTime}`
+    );
+
+    const end = new Date(
+      `${data.endDate}T${data.endTime}`
+    );
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    if (start < today) {
+      ctx.addIssue({
+        path: ["startDate"],
+        message: "Only today or future dates allowed",
+        code: z.ZodIssueCode.custom,
+      });
+    }
+
+    if (end < today) {
+      ctx.addIssue({
+        path: ["endDate"],
+        message: "End date must be today or later",
+        code: z.ZodIssueCode.custom,
+      });
+    }
+  })
+
+type TodoForm = z.infer<typeof todoFormSchema>
+
 import { getDb, todos, user, session, account } from '@repo/db'
 import { eq, and, sql } from 'drizzle-orm'
 
 import { handle } from 'hono/vercel'
-
-import {
-  signupSchema,
-  loginSchema,
-  patchTodoSchema,
-} from '@repo/schemas'
-
-import { todoFormSchema } from "@repo/schemas"
 
 // ==================== AUTH SETUP ====================
 const AUTH_SECRET = process.env.BETTER_AUTH_SECRET
