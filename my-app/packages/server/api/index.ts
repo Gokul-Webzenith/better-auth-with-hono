@@ -73,7 +73,6 @@ function initAuth() {
   }
 }
 
-// ================= DB =================
 
 let db: any = null
 
@@ -193,7 +192,13 @@ app.get('/health', (c) => {
 
 // ================= AUTH HANDLER =================
 
-app.all('/auth/*', (c) => auth.handler(c.req.raw))
+app.all('/auth/*', async (c) => {
+  const authInstance = initAuth()
+  if (!authInstance) {
+    return c.json({ error: 'Auth not available' }, 503)
+  }
+  return authInstance.handler(c.req.raw)
+})
 
 
 
